@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, User, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import ppswzLogo from "@/assets/ppswz-logo.jpg";
 
 const navItems = [
@@ -45,7 +46,18 @@ const Header = () => {
                 {item.label}
               </a>
             ))}
-            <Button size="sm">Join Us</Button>
+            <Link to="/dashboard">
+              <Button variant="outline" size="sm" className="gap-2">
+                <User className="w-4 h-4" />
+                Member
+              </Button>
+            </Link>
+            <Link to="/admin">
+              <Button size="sm" className="gap-2">
+                <Shield className="w-4 h-4" />
+                Admin
+              </Button>
+            </Link>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -78,7 +90,20 @@ const Header = () => {
                     {item.label}
                   </a>
                 ))}
-                <Button className="w-full mt-4">Join Us</Button>
+                <div className="space-y-2 mt-4">
+                  <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full gap-2">
+                      <User className="w-4 h-4" />
+                      Member Dashboard
+                    </Button>
+                  </Link>
+                  <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="w-full gap-2">
+                      <Shield className="w-4 h-4" />
+                      Admin Dashboard
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </motion.nav>
           )}
