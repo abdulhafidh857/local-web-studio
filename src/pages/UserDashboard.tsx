@@ -20,11 +20,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
 
   const membershipInfo = {
     type: "Professional Member",
@@ -104,13 +112,20 @@ const UserDashboard = () => {
             ))}
           </nav>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary-foreground/20">
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary-foreground/20 space-y-2">
             <Link to="/">
               <Button variant="ghost" className="w-full justify-start text-secondary-foreground/70 hover:text-secondary-foreground hover:bg-secondary-foreground/10">
-                <LogOut className="w-5 h-5 mr-3" />
                 Back to Website
               </Button>
             </Link>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-secondary-foreground/70 hover:text-secondary-foreground hover:bg-secondary-foreground/10"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-5 h-5 mr-3" />
+              Logout
+            </Button>
           </div>
         </aside>
 
@@ -135,11 +150,11 @@ const UserDashboard = () => {
               </button>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-semibold">
-                  F
+                  {user?.email?.charAt(0).toUpperCase() || "U"}
                 </div>
                 <div className="hidden sm:block">
-                  <p className="text-sm font-medium">Fatma Ali Hassan</p>
-                  <p className="text-xs text-muted-foreground">Member since 2023</p>
+                  <p className="text-sm font-medium">{user?.user_metadata?.full_name || "Member"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
             </div>
