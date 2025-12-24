@@ -16,7 +16,9 @@ import {
   Plus,
   Search,
   Check,
-  Loader2
+  Loader2,
+  ClipboardList,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,12 +50,26 @@ interface ContactSubmission {
   created_at: string;
 }
 
+interface MembershipApplication {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  profession: string | null;
+  organization: string | null;
+  experience_years: number | null;
+  motivation: string | null;
+  status: string | null;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [messages, setMessages] = useState<ContactSubmission[]>([]);
+  const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const { user, signOut } = useAuth();
@@ -66,19 +82,39 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, messagesRes] = await Promise.all([
+      const [profilesRes, rolesRes, messagesRes, applicationsRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("*"),
-        supabase.from("contact_submissions").select("*").order("created_at", { ascending: false })
+        supabase.from("contact_submissions").select("*").order("created_at", { ascending: false }),
+        supabase.from("membership_applications").select("*").order("created_at", { ascending: false })
       ]);
 
       if (profilesRes.data) setProfiles(profilesRes.data);
       if (rolesRes.data) setUserRoles(rolesRes.data);
       if (messagesRes.data) setMessages(messagesRes.data);
+      if (applicationsRes.data) setApplications(applicationsRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateApplicationStatus = async (id: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("membership_applications")
+        .update({ status })
+        .eq("id", id);
+
+      if (error) throw error;
+      
+      setApplications(applications.map(app => 
+        app.id === id ? { ...app, status } : app
+      ));
+      toast.success(`Application ${status}`);
+    } catch (error) {
+      toast.error("Failed to update application");
     }
   };
 
@@ -133,14 +169,15 @@ const AdminDashboard = () => {
 
   const stats = [
     { label: "Total Members", value: profiles.length.toString(), change: "Active", icon: Users },
-    { label: "Admins", value: userRoles.filter(r => r.role === "admin").length.toString(), change: "", icon: FileText },
+    { label: "Applications", value: applications.length.toString(), change: `${applications.filter(a => a.status === "pending").length} pending`, icon: ClipboardList },
     { label: "Contact Messages", value: messages.length.toString(), change: `${messages.filter(m => !m.is_read).length} unread`, icon: MessageSquare },
-    { label: "Today's Signups", value: profiles.filter(p => new Date(p.created_at).toDateString() === new Date().toDateString()).length.toString(), change: "Today", icon: BarChart3 },
+    { label: "Admins", value: userRoles.filter(r => r.role === "admin").length.toString(), change: "", icon: FileText },
   ];
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: BarChart3 },
     { id: "users", label: "User Management", icon: Users },
+    { id: "applications", label: "Applications", icon: ClipboardList },
     { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -459,6 +496,68 @@ const AdminDashboard = () => {
                           ))}
                           {messages.length === 0 && (
                             <p className="text-muted-foreground text-center py-8">No contact submissions yet</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {activeTab === "applications" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-lg font-semibold">Membership Applications ({applications.length})</h2>
+                      <p className="text-sm text-muted-foreground">{applications.filter(a => a.status === "pending").length} pending</p>
+                    </div>
+                    
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="divide-y">
+                          {applications.map((app) => (
+                            <div key={app.id} className={`p-4 ${app.status === "pending" ? 'bg-accent/5' : ''}`}>
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-3 flex-1">
+                                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                                    {app.full_name.charAt(0)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <p className="font-medium">{app.full_name}</p>
+                                      <span className={`text-xs px-2 py-0.5 rounded ${
+                                        app.status === "pending" ? 'bg-yellow-100 text-yellow-700' :
+                                        app.status === "approved" ? 'bg-green-100 text-green-700' :
+                                        'bg-red-100 text-red-700'
+                                      }`}>
+                                        {app.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-1">{app.email} {app.phone && `• ${app.phone}`}</p>
+                                    <p className="text-sm"><span className="font-medium">Profession:</span> {app.profession || "N/A"}</p>
+                                    {app.organization && <p className="text-sm"><span className="font-medium">Organization:</span> {app.organization}</p>}
+                                    {app.experience_years !== null && <p className="text-sm"><span className="font-medium">Experience:</span> {app.experience_years} years</p>}
+                                    {app.motivation && <p className="text-sm mt-2 text-muted-foreground">{app.motivation}</p>}
+                                    <p className="text-xs text-muted-foreground mt-2">{formatDate(app.created_at)}</p>
+                                  </div>
+                                </div>
+                                {app.status === "pending" && (
+                                  <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" className="text-green-600" onClick={() => updateApplicationStatus(app.id, "approved")}>
+                                      <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="text-destructive" onClick={() => updateApplicationStatus(app.id, "rejected")}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {applications.length === 0 && (
+                            <p className="text-muted-foreground text-center py-8">No membership applications yet</p>
                           )}
                         </div>
                       </CardContent>
