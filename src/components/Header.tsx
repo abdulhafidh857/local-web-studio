@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, User, Shield } from "lucide-react";
+import { Menu, X, User, Shield, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import ppswzLogo from "@/assets/ppswz-logo.jpg";
 
 const navItems = [
@@ -15,6 +16,14 @@ const navItems = [
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+    setIsMenuOpen(false);
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-b border-border">
@@ -46,18 +55,36 @@ const Header = () => {
                 {item.label}
               </a>
             ))}
-            <Link to="/dashboard">
-              <Button variant="outline" size="sm" className="gap-2">
-                <User className="w-4 h-4" />
-                Member
-              </Button>
-            </Link>
-            <Link to="/admin">
-              <Button size="sm" className="gap-2">
-                <Shield className="w-4 h-4" />
-                Admin
-              </Button>
-            </Link>
+            
+            {user ? (
+              <>
+                <Link to="/dashboard">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="w-4 h-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button variant="secondary" size="sm" className="gap-2">
+                      <Shield className="w-4 h-4" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
+                <Button variant="ghost" size="sm" className="gap-2" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Link to="/auth">
+                <Button size="sm" className="gap-2">
+                  <LogIn className="w-4 h-4" />
+                  Login
+                </Button>
+              </Link>
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
@@ -91,18 +118,35 @@ const Header = () => {
                   </a>
                 ))}
                 <div className="space-y-2 mt-4">
-                  <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
-                    <Button variant="outline" className="w-full gap-2">
-                      <User className="w-4 h-4" />
-                      Member Dashboard
-                    </Button>
-                  </Link>
-                  <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
-                    <Button className="w-full gap-2">
-                      <Shield className="w-4 h-4" />
-                      Admin Dashboard
-                    </Button>
-                  </Link>
+                  {user ? (
+                    <>
+                      <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                        <Button variant="outline" className="w-full gap-2">
+                          <User className="w-4 h-4" />
+                          Dashboard
+                        </Button>
+                      </Link>
+                      {isAdmin && (
+                        <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                          <Button variant="secondary" className="w-full gap-2">
+                            <Shield className="w-4 h-4" />
+                            Admin Dashboard
+                          </Button>
+                        </Link>
+                      )}
+                      <Button variant="ghost" className="w-full gap-2" onClick={handleSignOut}>
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full gap-2">
+                        <LogIn className="w-4 h-4" />
+                        Login / Sign Up
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </motion.nav>
