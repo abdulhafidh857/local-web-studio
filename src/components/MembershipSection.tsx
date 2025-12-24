@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Check, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import MembershipApplicationForm from "./MembershipApplicationForm";
 const membershipTypes = [
   {
     type: "Full Member",
@@ -66,8 +66,16 @@ const benefits = [
 const MembershipSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [selectedMembership, setSelectedMembership] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const handleApplyClick = (membershipType: string) => {
+    setSelectedMembership(membershipType);
+    setIsFormOpen(true);
+  };
 
   return (
+    <>
     <section id="membership" ref={ref} className="section-padding bg-secondary">
       <div className="container-max">
         <motion.div
@@ -135,6 +143,7 @@ const MembershipSection = () => {
                 variant={membership.featured ? "default" : "outline"}
                 className="w-full"
                 size="sm"
+                onClick={() => handleApplyClick(membership.type)}
               >
                 Apply Now
               </Button>
@@ -165,7 +174,14 @@ const MembershipSection = () => {
           </div>
         </motion.div>
       </div>
+
+      <MembershipApplicationForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        membershipType={selectedMembership || "Full Member"}
+      />
     </section>
+  </>
   );
 };
 
