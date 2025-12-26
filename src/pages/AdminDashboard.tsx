@@ -3,7 +3,6 @@ import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { 
   Users, 
-  FileText, 
   BarChart3, 
   MessageSquare, 
   Settings,
@@ -13,12 +12,12 @@ import {
   Edit,
   Trash2,
   Eye,
-  Plus,
   Search,
   Check,
   Loader2,
   ClipboardList,
-  X
+  X,
+  Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,11 +26,19 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import UserActivityPanel from "@/components/admin/UserActivityPanel";
+import UserDetailModal from "@/components/admin/UserDetailModal";
+import AnalyticsOverview from "@/components/admin/AnalyticsOverview";
 
 interface Profile {
   id: string;
   email: string | null;
   full_name: string | null;
+  phone: string | null;
+  location: string | null;
+  profession: string | null;
+  organization: string | null;
+  bio: string | null;
   created_at: string;
 }
 
@@ -63,6 +70,15 @@ interface MembershipApplication {
   created_at: string;
 }
 
+interface ActivityLog {
+  id: string;
+  user_id: string | null;
+  action: string;
+  description: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -70,8 +86,11 @@ const AdminDashboard = () => {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [messages, setMessages] = useState<ContactSubmission[]>([]);
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [userModalOpen, setUserModalOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -82,17 +101,19 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, messagesRes, applicationsRes] = await Promise.all([
+      const [profilesRes, rolesRes, messagesRes, applicationsRes, activitiesRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("*"),
         supabase.from("contact_submissions").select("*").order("created_at", { ascending: false }),
-        supabase.from("membership_applications").select("*").order("created_at", { ascending: false })
+        supabase.from("membership_applications").select("*").order("created_at", { ascending: false }),
+        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(100)
       ]);
 
       if (profilesRes.data) setProfiles(profilesRes.data);
       if (rolesRes.data) setUserRoles(rolesRes.data);
       if (messagesRes.data) setMessages(messagesRes.data);
       if (applicationsRes.data) setApplications(applicationsRes.data);
+      if (activitiesRes.data) setActivities(activitiesRes.data as ActivityLog[]);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -162,21 +183,32 @@ const AdminDashboard = () => {
     return role?.role || "user";
   };
 
+  const handleViewUser = (profile: Profile) => {
+    setSelectedUser(profile);
+    setUserModalOpen(true);
+  };
+
+  const handleRoleChange = (userId: string, newRole: string) => {
+    setUserRoles(userRoles.map(r => 
+      r.user_id === userId ? { ...r, role: newRole } : r
+    ));
+  };
+
+  const getUserActivities = (userId: string) => {
+    return activities.filter(a => a.user_id === userId);
+  };
+
   const filteredProfiles = profiles.filter(profile => 
     profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     profile.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const stats = [
-    { label: "Total Members", value: profiles.length.toString(), change: "Active", icon: Users },
-    { label: "Applications", value: applications.length.toString(), change: `${applications.filter(a => a.status === "pending").length} pending`, icon: ClipboardList },
-    { label: "Contact Messages", value: messages.length.toString(), change: `${messages.filter(m => !m.is_read).length} unread`, icon: MessageSquare },
-    { label: "Admins", value: userRoles.filter(r => r.role === "admin").length.toString(), change: "", icon: FileText },
-  ];
+  const adminCount = userRoles.filter(r => r.role === "admin").length;
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: BarChart3 },
     { id: "users", label: "User Management", icon: Users },
+    { id: "activity", label: "Activity Log", icon: Activity },
     { id: "applications", label: "Applications", icon: ClipboardList },
     { id: "messages", label: "Messages", icon: MessageSquare },
     { id: "settings", label: "Settings", icon: Settings },
@@ -262,7 +294,7 @@ const AdminDashboard = () => {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className="text-xl font-heading font-semibold capitalize">{activeTab}</h1>
+              <h1 className="text-xl font-heading font-semibold capitalize">{activeTab.replace(/-/g, " ")}</h1>
             </div>
 
             <div className="flex items-center gap-4">
@@ -292,92 +324,21 @@ const AdminDashboard = () => {
             ) : (
               <>
                 {activeTab === "overview" && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-6"
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {stats.map((stat, index) => (
-                        <Card key={index}>
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                                <p className="text-2xl font-bold">{stat.value}</p>
-                                <p className="text-xs text-secondary">{stat.change}</p>
-                              </div>
-                              <div className="p-3 bg-primary/10 rounded-lg">
-                                <stat.icon className="w-6 h-6 text-primary" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                  <AnalyticsOverview
+                    profiles={profiles}
+                    activities={activities}
+                    applications={applications}
+                    adminCount={adminCount}
+                  />
+                )}
 
-                    <div className="grid lg:grid-cols-2 gap-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Recent Members</CardTitle>
-                          <CardDescription>Latest member registrations</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {profiles.slice(0, 4).map((profile) => (
-                              <div key={profile.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                                    {profile.full_name?.charAt(0) || profile.email?.charAt(0) || "U"}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium">{profile.full_name || "No name"}</p>
-                                    <p className="text-sm text-muted-foreground">{profile.email}</p>
-                                  </div>
-                                </div>
-                                <span className={`text-xs px-2 py-1 rounded-full ${
-                                  getUserRole(profile.id) === 'admin' ? 'bg-primary/20 text-primary' : 'bg-secondary/20 text-secondary'
-                                }`}>
-                                  {getUserRole(profile.id)}
-                                </span>
-                              </div>
-                            ))}
-                            {profiles.length === 0 && (
-                              <p className="text-muted-foreground text-center py-4">No members yet</p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Recent Messages</CardTitle>
-                          <CardDescription>Contact form submissions</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {messages.slice(0, 4).map((msg) => (
-                              <div key={msg.id} className={`flex items-center justify-between p-3 rounded-lg ${
-                                msg.is_read ? 'bg-muted/50' : 'bg-accent/10 border border-accent/20'
-                              }`}>
-                                <div>
-                                  <p className="font-medium">{msg.name}</p>
-                                  <p className="text-sm text-muted-foreground line-clamp-1">{msg.message}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xs text-muted-foreground">{formatDate(msg.created_at)}</p>
-                                  {!msg.is_read && <span className="text-xs text-accent">Unread</span>}
-                                </div>
-                              </div>
-                            ))}
-                            {messages.length === 0 && (
-                              <p className="text-muted-foreground text-center py-4">No messages yet</p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </motion.div>
+                {activeTab === "activity" && (
+                  <UserActivityPanel
+                    activities={activities}
+                    profiles={profiles}
+                    loading={loading}
+                    onRefresh={fetchData}
+                  />
                 )}
 
                 {activeTab === "users" && (
@@ -396,6 +357,11 @@ const AdminDashboard = () => {
                           onChange={(e) => setSearchQuery(e.target.value)}
                         />
                       </div>
+                      <div className="flex gap-2">
+                        <span className="text-sm text-muted-foreground self-center">
+                          {filteredProfiles.length} users
+                        </span>
+                      </div>
                     </div>
 
                     <Card>
@@ -413,7 +379,7 @@ const AdminDashboard = () => {
                             </thead>
                             <tbody>
                               {filteredProfiles.map((profile) => (
-                                <tr key={profile.id} className="border-t">
+                                <tr key={profile.id} className="border-t hover:bg-muted/30">
                                   <td className="p-4">
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-sm font-semibold">
@@ -433,8 +399,20 @@ const AdminDashboard = () => {
                                   <td className="p-4 text-muted-foreground">{formatDate(profile.created_at)}</td>
                                   <td className="p-4">
                                     <div className="flex justify-end gap-2">
-                                      <button className="p-2 hover:bg-muted rounded-lg"><Eye className="w-4 h-4" /></button>
-                                      <button className="p-2 hover:bg-muted rounded-lg"><Edit className="w-4 h-4" /></button>
+                                      <button 
+                                        className="p-2 hover:bg-muted rounded-lg"
+                                        onClick={() => handleViewUser(profile)}
+                                        title="View Details"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        className="p-2 hover:bg-muted rounded-lg"
+                                        onClick={() => handleViewUser(profile)}
+                                        title="Edit User"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </button>
                                     </div>
                                   </td>
                                 </tr>
@@ -599,6 +577,15 @@ const AdminDashboard = () => {
           </div>
         </main>
       </div>
+
+      <UserDetailModal
+        user={selectedUser}
+        userRole={selectedUser ? getUserRole(selectedUser.id) : "user"}
+        activities={selectedUser ? getUserActivities(selectedUser.id) : []}
+        open={userModalOpen}
+        onOpenChange={setUserModalOpen}
+        onRoleChange={handleRoleChange}
+      />
     </>
   );
 };
