@@ -27,15 +27,28 @@ const Header = () => {
   };
 
   const scrollToSection = (sectionId: string) => {
-    if (location.pathname !== "/") {
-      navigate("/", { state: { scrollTo: sectionId } });
-    } else {
+    setIsMenuOpen(false);
+    
+    const scrollTo = () => {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ behavior: "smooth" });
+        const headerOffset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
       }
+    };
+
+    if (location.pathname !== "/") {
+      navigate("/");
+      setTimeout(scrollTo, 150);
+    } else {
+      scrollTo();
     }
-    setIsMenuOpen(false);
   };
 
   return (
