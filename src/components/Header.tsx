@@ -2,26 +2,39 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, User, Shield, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import ppswzLogo from "@/assets/ppswz-logo.jpg";
 
 const navItems = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Services", href: "#services" },
-  { label: "Membership", href: "#membership" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "home" },
+  { label: "About", href: "about" },
+  { label: "Services", href: "services" },
+  { label: "Membership", href: "membership" },
+  { label: "Contact", href: "contact" },
 ];
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+    setIsMenuOpen(false);
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    if (location.pathname !== "/") {
+      navigate("/", { state: { scrollTo: sectionId } });
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    }
     setIsMenuOpen(false);
   };
 
@@ -30,7 +43,7 @@ const Header = () => {
       <div className="container-max">
         <div className="flex items-center justify-between h-20 px-4 md:px-8">
           {/* Logo */}
-          <a href="#home" className="flex items-center gap-3">
+          <button onClick={() => scrollToSection("home")} className="flex items-center gap-3">
             <img
               src={ppswzLogo}
               alt="PPSWZ Logo"
@@ -42,18 +55,18 @@ const Header = () => {
               </h1>
               <p className="text-xs text-muted-foreground">Zanzibar</p>
             </div>
-          </a>
+          </button>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
-              <a
+              <button
                 key={item.label}
-                href={item.href}
+                onClick={() => scrollToSection(item.href)}
                 className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors duration-300"
               >
                 {item.label}
-              </a>
+              </button>
             ))}
             
             {user ? (
@@ -108,14 +121,13 @@ const Header = () => {
             >
               <div className="px-4 py-6 space-y-4">
                 {navItems.map((item) => (
-                  <a
+                  <button
                     key={item.label}
-                    href={item.href}
-                    onClick={() => setIsMenuOpen(false)}
-                    className="block text-base font-medium text-foreground/80 hover:text-primary transition-colors duration-300"
+                    onClick={() => scrollToSection(item.href)}
+                    className="block text-base font-medium text-foreground/80 hover:text-primary transition-colors duration-300 w-full text-left"
                   >
                     {item.label}
-                  </a>
+                  </button>
                 ))}
                 <div className="space-y-2 mt-4">
                   {user ? (
