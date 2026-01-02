@@ -20,8 +20,8 @@ const contactInfo = [
   {
     icon: Phone,
     label: "Phone",
-    value: "+255 7XX XXX XXX",
-    subvalue: "+255 6XX XXX XXX",
+    value: "0677732141",
+    subvalue: "",
   },
   {
     icon: Mail,
@@ -167,7 +167,7 @@ const ContactSection = () => {
               variant="outline"
               size="lg"
               className="w-full sm:w-auto"
-              onClick={() => window.open("https://wa.me/2557XXXXXXXX", "_blank")}
+              onClick={() => window.open("https://wa.me/255677732141", "_blank")}
             >
               <MessageCircle className="mr-2 w-5 h-5" />
               Chat on WhatsApp
