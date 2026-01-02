@@ -65,11 +65,36 @@ const HeroSection = () => {
             transition={{ delay: 0.7 }}
             className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
           >
-            <Button variant="accent" size="lg" className="group">
+            <Button 
+              variant="accent" 
+              size="lg" 
+              className="group"
+              onClick={() => {
+                const element = document.getElementById('membership');
+                if (element) {
+                  const headerOffset = 80;
+                  const elementPosition = element.getBoundingClientRect().top;
+                  const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                  window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+              }}
+            >
               Join PPSWZ Today
               <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="heroOutline" size="lg">
+            <Button 
+              variant="heroOutline" 
+              size="lg"
+              onClick={() => {
+                const element = document.getElementById('about');
+                if (element) {
+                  const headerOffset = 80;
+                  const elementPosition = element.getBoundingClientRect().top;
+                  const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                  window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+              }}
+            >
               Learn More
             </Button>
           </motion.div>

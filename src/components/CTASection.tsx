@@ -43,11 +43,36 @@ const CTASection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="accent" size="lg" className="group">
+            <Button 
+              variant="accent" 
+              size="lg" 
+              className="group"
+              onClick={() => {
+                const element = document.getElementById('membership');
+                if (element) {
+                  const headerOffset = 80;
+                  const elementPosition = element.getBoundingClientRect().top;
+                  const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                  window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+              }}
+            >
               Become a Member
               <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="heroOutline" size="lg">
+            <Button 
+              variant="heroOutline" 
+              size="lg"
+              onClick={() => {
+                const element = document.getElementById('about');
+                if (element) {
+                  const headerOffset = 80;
+                  const elementPosition = element.getBoundingClientRect().top;
+                  const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                  window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                }
+              }}
+            >
               Learn More About Us
             </Button>
           </div>
