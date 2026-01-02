@@ -17,7 +17,12 @@ import {
   Award,
   CheckCircle,
   Save,
-  Loader2
+  Loader2,
+  Wallet,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +32,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Profile {
   id: string;
@@ -40,13 +47,33 @@ interface Profile {
   created_at: string;
 }
 
+interface Payment {
+  id: string;
+  user_id: string;
+  amount: number;
+  payment_method: string;
+  reference_number: string | null;
+  proof_description: string | null;
+  status: string;
+  created_at: string;
+}
+
 const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    payment_method: "",
+    reference_number: "",
+    proof_description: ""
+  });
   const [editForm, setEditForm] = useState({
     full_name: "",
     phone: "",
@@ -61,6 +88,7 @@ const UserDashboard = () => {
   useEffect(() => {
     if (user) {
       fetchProfile();
+      fetchPayments();
     }
   }, [user]);
 
@@ -92,6 +120,56 @@ const UserDashboard = () => {
       console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPayments = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      if (data) setPayments(data);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!user) return;
+    if (!paymentForm.amount || !paymentForm.payment_method) {
+      toast.error("Please fill in amount and payment method");
+      return;
+    }
+    
+    setSubmittingPayment(true);
+    try {
+      const { error } = await supabase
+        .from("payments")
+        .insert({
+          user_id: user.id,
+          amount: parseFloat(paymentForm.amount),
+          payment_method: paymentForm.payment_method,
+          reference_number: paymentForm.reference_number || null,
+          proof_description: paymentForm.proof_description || null
+        });
+
+      if (error) throw error;
+      
+      toast.success("Payment submitted successfully! Awaiting admin verification.");
+      setPaymentDialogOpen(false);
+      setPaymentForm({ amount: "", payment_method: "", reference_number: "", proof_description: "" });
+      fetchPayments();
+    } catch (error) {
+      console.error("Error submitting payment:", error);
+      toast.error("Failed to submit payment");
+    } finally {
+      setSubmittingPayment(false);
     }
   };
 
@@ -146,10 +224,43 @@ const UserDashboard = () => {
 
   const sidebarItems = [
     { id: "profile", label: "My Profile", icon: User },
+    { id: "payments", label: "Payments", icon: Wallet },
     { id: "membership", label: "Membership", icon: CreditCard },
     { id: "resources", label: "Resources", icon: FolderOpen },
     { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case "verified":
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+      case "rejected":
+        return <XCircle className="w-4 h-4 text-destructive" />;
+      default:
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case "verified":
+        return "bg-green-100 text-green-700";
+      case "rejected":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-yellow-100 text-yellow-700";
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
 
   return (
     <>
@@ -381,6 +492,139 @@ const UserDashboard = () => {
                                 </div>
                               )}
                             </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {activeTab === "payments" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-lg font-semibold">My Payments</h2>
+                        <p className="text-sm text-muted-foreground">Submit and track your payment confirmations</p>
+                      </div>
+                      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Submit Payment
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Submit Payment Confirmation</DialogTitle>
+                            <DialogDescription>
+                              Enter your payment details for admin verification
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div>
+                              <label className="text-sm font-medium mb-2 block">Amount (TZS) *</label>
+                              <Input 
+                                type="number"
+                                placeholder="Enter amount"
+                                value={paymentForm.amount}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium mb-2 block">Payment Method *</label>
+                              <Select 
+                                value={paymentForm.payment_method}
+                                onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select payment method" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="M-Pesa">M-Pesa</SelectItem>
+                                  <SelectItem value="Mix by Yas">Mix by Yas</SelectItem>
+                                  <SelectItem value="PBZ Bank">PBZ Bank</SelectItem>
+                                  <SelectItem value="NMB Bank">NMB Bank</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium mb-2 block">Reference/Transaction Number</label>
+                              <Input 
+                                placeholder="Enter reference number"
+                                value={paymentForm.reference_number}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium mb-2 block">Additional Notes</label>
+                              <Textarea 
+                                placeholder="Add any additional details about your payment..."
+                                value={paymentForm.proof_description}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, proof_description: e.target.value })}
+                                rows={3}
+                              />
+                            </div>
+                            <Button 
+                              className="w-full" 
+                              onClick={handleSubmitPayment}
+                              disabled={submittingPayment}
+                            >
+                              {submittingPayment ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Submitting...
+                                </>
+                              ) : (
+                                "Submit Payment"
+                              )}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="divide-y">
+                          {payments.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Wallet className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                              <p>No payments submitted yet</p>
+                              <p className="text-sm mt-2">Click "Submit Payment" to add your first payment</p>
+                            </div>
+                          ) : (
+                            payments.map((payment) => (
+                              <div key={payment.id} className="p-4 hover:bg-muted/30 transition-colors">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                      <Wallet className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-semibold">TZS {payment.amount.toLocaleString()}</p>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${getPaymentStatusColor(payment.status)}`}>
+                                          {getPaymentStatusIcon(payment.status)}
+                                          {payment.status}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">{payment.payment_method}</p>
+                                      {payment.reference_number && (
+                                        <p className="text-sm text-muted-foreground">Ref: {payment.reference_number}</p>
+                                      )}
+                                      {payment.proof_description && (
+                                        <p className="text-sm text-muted-foreground mt-1">{payment.proof_description}</p>
+                                      )}
+                                      <p className="text-xs text-muted-foreground mt-2">{formatDate(payment.created_at)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
                       </CardContent>
