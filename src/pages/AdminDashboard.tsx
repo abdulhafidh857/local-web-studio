@@ -17,7 +17,11 @@ import {
   Loader2,
   ClipboardList,
   X,
-  Activity
+  Activity,
+  Wallet,
+  CheckCircle2,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +83,19 @@ interface ActivityLog {
   created_at: string;
 }
 
+interface Payment {
+  id: string;
+  user_id: string;
+  amount: number;
+  payment_method: string;
+  reference_number: string | null;
+  proof_description: string | null;
+  status: string;
+  verified_by: string | null;
+  verified_at: string | null;
+  created_at: string;
+}
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -87,6 +104,7 @@ const AdminDashboard = () => {
   const [messages, setMessages] = useState<ContactSubmission[]>([]);
   const [applications, setApplications] = useState<MembershipApplication[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
@@ -101,12 +119,13 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [profilesRes, rolesRes, messagesRes, applicationsRes, activitiesRes] = await Promise.all([
+      const [profilesRes, rolesRes, messagesRes, applicationsRes, activitiesRes, paymentsRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("*"),
         supabase.from("contact_submissions").select("*").order("created_at", { ascending: false }),
         supabase.from("membership_applications").select("*").order("created_at", { ascending: false }),
-        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(100)
+        supabase.from("activity_logs").select("*").order("created_at", { ascending: false }).limit(100),
+        supabase.from("payments").select("*").order("created_at", { ascending: false })
       ]);
 
       if (profilesRes.data) setProfiles(profilesRes.data);
@@ -114,10 +133,33 @@ const AdminDashboard = () => {
       if (messagesRes.data) setMessages(messagesRes.data);
       if (applicationsRes.data) setApplications(applicationsRes.data);
       if (activitiesRes.data) setActivities(activitiesRes.data as ActivityLog[]);
+      if (paymentsRes.data) setPayments(paymentsRes.data);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updatePaymentStatus = async (id: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("payments")
+        .update({ 
+          status,
+          verified_by: user?.id,
+          verified_at: new Date().toISOString()
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+      
+      setPayments(payments.map(p => 
+        p.id === id ? { ...p, status, verified_by: user?.id || null, verified_at: new Date().toISOString() } : p
+      ));
+      toast.success(`Payment ${status}`);
+    } catch (error) {
+      toast.error("Failed to update payment");
     }
   };
 
@@ -198,15 +240,22 @@ const AdminDashboard = () => {
     return activities.filter(a => a.user_id === userId);
   };
 
+  const getUserName = (userId: string) => {
+    const profile = profiles.find(p => p.id === userId);
+    return profile?.full_name || profile?.email || "Unknown User";
+  };
+
   const filteredProfiles = profiles.filter(profile => 
     profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     profile.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const adminCount = userRoles.filter(r => r.role === "admin").length;
+  const pendingPaymentsCount = payments.filter(p => p.status === "pending").length;
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: BarChart3 },
+    { id: "payments", label: "Payments", icon: Wallet },
     { id: "users", label: "User Management", icon: Users },
     { id: "activity", label: "Activity Log", icon: Activity },
     { id: "applications", label: "Applications", icon: ClipboardList },
@@ -220,6 +269,28 @@ const AdminDashboard = () => {
       month: "short",
       day: "numeric"
     });
+  };
+
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case "verified":
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+      case "rejected":
+        return <XCircle className="w-4 h-4 text-destructive" />;
+      default:
+        return <Clock className="w-4 h-4 text-yellow-600" />;
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case "verified":
+        return "bg-green-100 text-green-700";
+      case "rejected":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-yellow-100 text-yellow-700";
+    }
   };
 
   return (
@@ -330,6 +401,129 @@ const AdminDashboard = () => {
                     applications={applications}
                     adminCount={adminCount}
                   />
+                )}
+
+                {activeTab === "payments" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                          <Wallet className="w-5 h-5 text-primary" />
+                          Payment Tracking
+                        </h2>
+                        <p className="text-sm text-muted-foreground">{payments.length} total payments • {pendingPaymentsCount} pending</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                              <Clock className="w-5 h-5 text-yellow-600" />
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold">{payments.filter(p => p.status === "pending").length}</p>
+                              <p className="text-sm text-muted-foreground">Pending</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                              <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold">{payments.filter(p => p.status === "verified").length}</p>
+                              <p className="text-sm text-muted-foreground">Verified</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                              <XCircle className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold">{payments.filter(p => p.status === "rejected").length}</p>
+                              <p className="text-sm text-muted-foreground">Rejected</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card>
+                      <CardContent className="p-0">
+                        <div className="divide-y">
+                          {payments.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <Wallet className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                              <p>No payments submitted yet</p>
+                            </div>
+                          ) : (
+                            payments.map((payment) => (
+                              <div key={payment.id} className={`p-4 ${payment.status === "pending" ? 'bg-accent/5' : ''}`}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-start gap-3 flex-1">
+                                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                                      {getUserName(payment.user_id).charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <p className="font-medium">{getUserName(payment.user_id)}</p>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${getPaymentStatusColor(payment.status)}`}>
+                                          {getPaymentStatusIcon(payment.status)}
+                                          {payment.status}
+                                        </span>
+                                      </div>
+                                      <p className="text-lg font-semibold text-primary">TZS {payment.amount.toLocaleString()}</p>
+                                      <p className="text-sm text-muted-foreground">{payment.payment_method}</p>
+                                      {payment.reference_number && (
+                                        <p className="text-sm text-muted-foreground">Ref: {payment.reference_number}</p>
+                                      )}
+                                      {payment.proof_description && (
+                                        <p className="text-sm text-muted-foreground mt-1">{payment.proof_description}</p>
+                                      )}
+                                      <p className="text-xs text-muted-foreground mt-2">{formatDate(payment.created_at)}</p>
+                                    </div>
+                                  </div>
+                                  {payment.status === "pending" && (
+                                    <div className="flex gap-2">
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50" 
+                                        onClick={() => updatePaymentStatus(payment.id, "verified")}
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="text-destructive hover:text-destructive hover:bg-red-50" 
+                                        onClick={() => updatePaymentStatus(payment.id, "rejected")}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 )}
 
                 {activeTab === "activity" && (
