@@ -122,10 +122,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setUserRole(null);
+    try {
+      // Sign out from Supabase (invalidates session on server and clears local storage)
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      // Always clear local state regardless of API success
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+    }
   };
 
   const value = {
