@@ -1,8 +1,12 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { toast } from "sonner";
 
 type AppRole = "admin" | "user";
+
+const SESSION_TIMEOUT_MINUTES = 30; // Configurable timeout duration
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +38,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Session timeout callback
+  const handleSessionTimeout = useCallback(async () => {
+    toast.warning("Session expired due to inactivity. Please log in again.");
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.error("Error signing out on timeout:", error);
+    } finally {
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+    }
+  }, []);
+
+  // Enable session timeout only when user is logged in
+  useSessionTimeout({
+    timeoutMinutes: SESSION_TIMEOUT_MINUTES,
+    onTimeout: handleSessionTimeout,
+    enabled: !!user,
+  });
 
   const fetchUserRole = async (userId: string) => {
     try {
