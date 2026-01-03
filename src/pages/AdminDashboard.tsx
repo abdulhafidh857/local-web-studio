@@ -236,6 +236,36 @@ const AdminDashboard = () => {
     ));
   };
 
+  const deleteUser = async (userId: string) => {
+    if (userId === user?.id) {
+      toast.error("You cannot delete your own account");
+      return;
+    }
+    
+    try {
+      // Delete from profiles (will cascade to related data)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+
+      if (profileError) throw profileError;
+
+      // Delete user role
+      await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
+
+      setProfiles(profiles.filter(p => p.id !== userId));
+      setUserRoles(userRoles.filter(r => r.user_id !== userId));
+      toast.success("User deleted successfully");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Failed to delete user");
+    }
+  };
+
   const getUserActivities = (userId: string) => {
     return activities.filter(a => a.user_id === userId);
   };
@@ -606,6 +636,18 @@ const AdminDashboard = () => {
                                         title="Edit User"
                                       >
                                         <Edit className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        className="p-2 hover:bg-muted rounded-lg text-destructive hover:bg-destructive/10"
+                                        onClick={() => {
+                                          if (confirm(`Are you sure you want to delete ${profile.full_name || profile.email}?`)) {
+                                            deleteUser(profile.id);
+                                          }
+                                        }}
+                                        title="Delete User"
+                                        disabled={profile.id === user?.id}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
                                       </button>
                                     </div>
                                   </td>
