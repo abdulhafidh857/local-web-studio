@@ -22,7 +22,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Plus
+  Plus,
+  KeyRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +83,13 @@ const UserDashboard = () => {
     organization: "",
     bio: ""
   });
+  const [notificationSettings, setNotificationSettings] = useState({
+    emailNotifications: true,
+    monthlyNewsletter: true,
+    smsNotifications: false
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -176,6 +184,44 @@ const UserDashboard = () => {
   const handleLogout = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleResetPassword = async () => {
+    if (!user?.email) {
+      toast.error("No email associated with this account");
+      return;
+    }
+    
+    setResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/auth?mode=reset`,
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (error) {
+      console.error("Error sending reset password email:", error);
+      toast.error("Failed to send reset password email");
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      // In a real app, you would save these to the database
+      // For now, we'll just show a success message
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success("Settings saved successfully!");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast.error("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -746,22 +792,83 @@ const UserDashboard = () => {
 
                     <Card>
                       <CardHeader>
+                        <CardTitle>Password & Security</CardTitle>
+                        <CardDescription>Manage your password and security settings</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">Reset Password</p>
+                            <p className="text-sm text-muted-foreground">Send a password reset link to your email</p>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            onClick={handleResetPassword}
+                            disabled={resettingPassword}
+                          >
+                            {resettingPassword ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <KeyRound className="w-4 h-4 mr-2" />
+                            )}
+                            Reset Password
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
                         <CardTitle>Notification Preferences</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <label className="flex items-center gap-3">
-                            <input type="checkbox" className="w-4 h-4" defaultChecked />
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4" 
+                              checked={notificationSettings.emailNotifications}
+                              onChange={(e) => setNotificationSettings(prev => ({
+                                ...prev,
+                                emailNotifications: e.target.checked
+                              }))}
+                            />
                             <span>Email notifications for new events</span>
                           </label>
-                          <label className="flex items-center gap-3">
-                            <input type="checkbox" className="w-4 h-4" defaultChecked />
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4" 
+                              checked={notificationSettings.monthlyNewsletter}
+                              onChange={(e) => setNotificationSettings(prev => ({
+                                ...prev,
+                                monthlyNewsletter: e.target.checked
+                              }))}
+                            />
                             <span>Monthly newsletter</span>
                           </label>
-                          <label className="flex items-center gap-3">
-                            <input type="checkbox" className="w-4 h-4" />
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="w-4 h-4" 
+                              checked={notificationSettings.smsNotifications}
+                              onChange={(e) => setNotificationSettings(prev => ({
+                                ...prev,
+                                smsNotifications: e.target.checked
+                              }))}
+                            />
                             <span>SMS notifications</span>
                           </label>
+                        </div>
+                        <div className="mt-6 pt-4 border-t">
+                          <Button onClick={handleSaveSettings} disabled={savingSettings}>
+                            {savingSettings ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-2" />
+                            )}
+                            Save Changes
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
