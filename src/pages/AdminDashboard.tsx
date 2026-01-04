@@ -19,6 +19,7 @@ import {
   X,
   Activity,
   Wallet,
+  Megaphone,
   CheckCircle2,
   XCircle,
   Clock
@@ -33,6 +34,7 @@ import { toast } from "sonner";
 import UserActivityPanel from "@/components/admin/UserActivityPanel";
 import UserDetailModal from "@/components/admin/UserDetailModal";
 import AnalyticsOverview from "@/components/admin/AnalyticsOverview";
+import AdvertisementManager from "@/components/admin/AdvertisementManager";
 
 interface Profile {
   id: string;
@@ -285,6 +287,7 @@ const AdminDashboard = () => {
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: BarChart3 },
+    { id: "advertisements", label: "Advertisements", icon: Megaphone },
     { id: "payments", label: "Payments", icon: Wallet },
     { id: "users", label: "User Management", icon: Users },
     { id: "activity", label: "Activity Log", icon: Activity },
@@ -431,6 +434,10 @@ const AdminDashboard = () => {
                     applications={applications}
                     adminCount={adminCount}
                   />
+                )}
+
+                {activeTab === "advertisements" && (
+                  <AdvertisementManager />
                 )}
 
                 {activeTab === "payments" && (
