@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
+import AdvertisementSection from "@/components/AdvertisementSection";
 import AboutSection from "@/components/AboutSection";
 import ServicesSection from "@/components/ServicesSection";
 import GoalsSection from "@/components/GoalsSection";
@@ -52,6 +53,7 @@ const Index = () => {
         <Header />
         <main>
           <HeroSection />
+          <AdvertisementSection />
           <AboutSection />
           <ServicesSection />
           <GoalsSection />
