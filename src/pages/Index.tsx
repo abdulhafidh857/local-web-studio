@@ -52,12 +52,12 @@ const Index = () => {
       <div className="min-h-screen">
         <Header />
         <main>
-          <HeroSection />
-          <AdvertisementSection />
+        <HeroSection />
           <AboutSection />
           <ServicesSection />
           <GoalsSection />
           <MembershipSection />
+          <AdvertisementSection />
           <PaymentSection />
           <CTASection />
           <ContactSection />
