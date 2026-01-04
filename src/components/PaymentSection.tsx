@@ -41,12 +41,12 @@ const paymentMethods = [
     },
   },
   {
-    name: "NMB Bank",
+    name: "CRDB Bank",
     icon: CreditCard,
     type: "Bank Transfer",
     color: "bg-green-600",
     details: {
-      accountNumber: "XXXX-XXXX-XXXX",
+      accountNumber: "0152898853100",
       accountName: "Private Practice in Social Work Zanzibar",
       branch: "Zanzibar Branch",
     },
