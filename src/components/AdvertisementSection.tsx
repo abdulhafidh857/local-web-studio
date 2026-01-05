@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Megaphone, ChevronLeft, ChevronRight } from "lucide-react";
+import { Megaphone, ChevronLeft, ChevronRight, FileText, Download, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,12 @@ interface Advertisement {
   is_active: boolean;
   priority: number;
   created_at: string;
+}
+
+interface ParsedFile {
+  url: string;
+  type: 'image' | 'pdf' | 'doc' | 'file';
+  name: string;
 }
 
 const AdvertisementSection = () => {
@@ -42,6 +48,23 @@ const AdvertisementSection = () => {
     }
   };
 
+  const parseFiles = (imageUrl: string | null): ParsedFile[] => {
+    if (!imageUrl) return [];
+    
+    return imageUrl.split(',').filter(url => url.trim()).map(url => {
+      const trimmedUrl = url.trim();
+      const extension = trimmedUrl.split('.').pop()?.toLowerCase();
+      const name = trimmedUrl.split('/').pop() || 'file';
+      
+      let type: 'image' | 'pdf' | 'doc' | 'file' = 'file';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '')) type = 'image';
+      else if (extension === 'pdf') type = 'pdf';
+      else if (['doc', 'docx'].includes(extension || '')) type = 'doc';
+      
+      return { url: trimmedUrl, type, name };
+    });
+  };
+
   const nextSlide = () => {
     setCurrentIndex((prev) => (prev + 1) % advertisements.length);
   };
@@ -62,6 +85,10 @@ const AdvertisementSection = () => {
   }
 
   const currentAd = advertisements[currentIndex];
+  const files = parseFiles(currentAd.image_url);
+  const images = files.filter(f => f.type === 'image');
+  const documents = files.filter(f => f.type !== 'image');
+  const primaryImage = images[0];
 
   return (
     <section className="py-16 bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -92,11 +119,11 @@ const AdvertisementSection = () => {
           >
             <Card className="overflow-hidden border-primary/20 shadow-lg">
               <CardContent className="p-0">
-                <div className={`grid ${currentAd.image_url ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
-                  {currentAd.image_url && (
+                <div className={`grid ${primaryImage ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
+                  {primaryImage && (
                     <div className="h-64 md:h-80">
                       <img
-                        src={currentAd.image_url}
+                        src={primaryImage.url}
                         alt={currentAd.title}
                         className="w-full h-full object-cover"
                       />
@@ -109,6 +136,46 @@ const AdvertisementSection = () => {
                     <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {currentAd.content}
                     </p>
+                    
+                    {/* Additional Images */}
+                    {images.length > 1 && (
+                      <div className="flex gap-2 mt-4 flex-wrap">
+                        {images.slice(1).map((img, idx) => (
+                          <a
+                            key={idx}
+                            href={img.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-16 h-16 rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
+                          >
+                            <img src={img.url} alt="" className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Document Attachments */}
+                    {documents.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm font-medium text-foreground">Attachments:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {documents.map((doc, idx) => (
+                            <a
+                              key={idx}
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-sm"
+                            >
+                              <FileText className={`w-4 h-4 ${doc.type === 'pdf' ? 'text-red-500' : 'text-blue-500'}`} />
+                              <span className="max-w-[150px] truncate">{doc.name}</span>
+                              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-muted-foreground mt-4">
                       Posted: {new Date(currentAd.created_at).toLocaleDateString("en-US", {
                         year: "numeric",

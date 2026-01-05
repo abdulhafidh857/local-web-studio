@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   Megaphone, 
@@ -8,7 +8,11 @@ import {
   Eye, 
   EyeOff, 
   Loader2,
-  X 
+  X,
+  Upload,
+  FileText,
+  Image as ImageIcon,
+  File
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +30,12 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface UploadedFile {
+  name: string;
+  url: string;
+  type: string;
+}
 
 interface Advertisement {
   id: string;
@@ -48,7 +58,10 @@ const AdvertisementManager = ({ onRefresh }: AdvertisementManagerProps) => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editingAd, setEditingAd] = useState<Advertisement | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -90,6 +103,17 @@ const AdvertisementManager = ({ onRefresh }: AdvertisementManagerProps) => {
         is_active: ad.is_active,
         priority: ad.priority
       });
+      // Parse existing files from image_url if it contains multiple URLs
+      if (ad.image_url) {
+        const urls = ad.image_url.split(',').filter(url => url.trim());
+        setUploadedFiles(urls.map(url => ({
+          name: url.split('/').pop() || 'file',
+          url: url.trim(),
+          type: getFileTypeFromUrl(url)
+        })));
+      } else {
+        setUploadedFiles([]);
+      }
     } else {
       setEditingAd(null);
       setFormData({
@@ -99,8 +123,101 @@ const AdvertisementManager = ({ onRefresh }: AdvertisementManagerProps) => {
         is_active: true,
         priority: 0
       });
+      setUploadedFiles([]);
     }
     setDialogOpen(true);
+  };
+
+  const getFileTypeFromUrl = (url: string): string => {
+    const extension = url.split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '')) return 'image';
+    if (['pdf'].includes(extension || '')) return 'pdf';
+    if (['doc', 'docx'].includes(extension || '')) return 'doc';
+    return 'file';
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    const newFiles: UploadedFile[] = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${user?.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('advertisement-files')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('advertisement-files')
+          .getPublicUrl(filePath);
+
+        let fileType = 'file';
+        if (file.type.startsWith('image/')) fileType = 'image';
+        else if (file.type === 'application/pdf') fileType = 'pdf';
+        else if (file.type.includes('document') || file.type.includes('msword')) fileType = 'doc';
+
+        newFiles.push({
+          name: file.name,
+          url: publicUrl,
+          type: fileType
+        });
+      }
+
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      
+      // Update image_url with all file URLs
+      const allUrls = [...uploadedFiles, ...newFiles].map(f => f.url).join(',');
+      setFormData(prev => ({ ...prev, image_url: allUrls }));
+      
+      toast.success(`${newFiles.length} file(s) uploaded successfully`);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toast.error("Failed to upload file");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeUploadedFile = async (fileToRemove: UploadedFile) => {
+    try {
+      // Extract file path from URL
+      const urlParts = fileToRemove.url.split('/advertisement-files/');
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1];
+        await supabase.storage
+          .from('advertisement-files')
+          .remove([filePath]);
+      }
+
+      const newFiles = uploadedFiles.filter(f => f.url !== fileToRemove.url);
+      setUploadedFiles(newFiles);
+      setFormData(prev => ({ ...prev, image_url: newFiles.map(f => f.url).join(',') }));
+      toast.success("File removed");
+    } catch (error) {
+      console.error("Error removing file:", error);
+      toast.error("Failed to remove file");
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'image': return <ImageIcon className="w-4 h-4" />;
+      case 'pdf': return <FileText className="w-4 h-4 text-red-500" />;
+      case 'doc': return <FileText className="w-4 h-4 text-blue-500" />;
+      default: return <File className="w-4 h-4" />;
+    }
   };
 
   const handleSave = async () => {
@@ -338,7 +455,56 @@ const AdvertisementManager = ({ onRefresh }: AdvertisementManagerProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="image_url">Image URL (optional)</Label>
+              <Label>Upload Files (Images, PDFs, Documents)</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full"
+              >
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-2" />
+                )}
+                {uploading ? "Uploading..." : "Upload Files"}
+              </Button>
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-muted rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        {getFileIcon(file.type)}
+                        <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeUploadedFile(file)}
+                        className="shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="image_url">Or paste URL (optional)</Label>
               <Input
                 id="image_url"
                 value={formData.image_url}
