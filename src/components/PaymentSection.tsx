@@ -191,7 +191,7 @@ const PaymentSection = () => {
         >
           <p className="text-muted-foreground">
             After making your payment, please send proof of payment to{" "}
-            <span className="text-primary font-medium">info@ppswz.or.tz</span>{" "}
+            <span className="text-primary font-medium">ppswz@gmail.com</span>{" "}
             or via WhatsApp for confirmation.
           </p>
         </motion.div>

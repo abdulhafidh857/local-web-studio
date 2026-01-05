@@ -26,8 +26,8 @@ const contactInfo = [
   {
     icon: Mail,
     label: "Email",
-    value: "info@ppswz.or.tz",
-    subvalue: "ppswz@gmail.com",
+    value: "ppswz@gmail.com",
+    subvalue: "",
   },
   {
     icon: MapPin,

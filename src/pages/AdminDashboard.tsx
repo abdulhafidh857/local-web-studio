@@ -807,7 +807,7 @@ const AdminDashboard = () => {
                           </div>
                           <div>
                             <label className="text-sm font-medium mb-2 block">Contact Email</label>
-                            <Input defaultValue="info@ppswz.or.tz" />
+                            <Input defaultValue="ppswz@gmail.com" />
                           </div>
                           <Button>Save Changes</Button>
                         </CardContent>
